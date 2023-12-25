@@ -664,10 +664,10 @@ function pingTest(done) {
 				// more pings to do?
 				pingProgress = 1;
 				tlog("ping: " + pingStatus + " jitter: " + jitterStatus + ", took " + (new Date().getTime() - startT) + "ms");
-				console.log("ping: " + pingStatus + " jitter: " + jitterStatus + ", took " + (new Date().getTime() - startT) + "ms");
+				console.log("ping: " + pingStatus + " jitter: " + jitterStatus + ", took " + (new Date().getTime() - startT) + "ms" + ", totalInstspd " + totalInstspd);
 
 				// jitterStatus = pingStatus;
-				pingStatus = (totalInstspd/settings.count_ping - 1).toFixed(2); // 改用来显示平均值
+				pingStatus = (totalInstspd/(settings.count_ping - 1)).toFixed(2); // 改用来显示平均值
 				done();
 			}
 		}.bind(this);
