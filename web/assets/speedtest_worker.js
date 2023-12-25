@@ -44,7 +44,7 @@ var settings = {
 	time_auto: true, // if set to true, tests will take less time on faster connections
 	time_ulGraceTime: 3, //time to wait in seconds before actually measuring ul speed (wait for buffers to fill)
 	time_dlGraceTime: 1.5, //time to wait in seconds before actually measuring dl speed (wait for TCP window to increase)
-	count_ping: 10, // number of pings to perform in ping test
+	count_ping: 100, // number of pings to perform in ping test
 	url_dl: "backend/garbage.php", // path to a large file or garbage.php, used for download test. must be relative to this js file
 	url_ul: "backend/empty.php", // path to an empty file, used for upload test. must be relative to this js file
 	url_ping: "backend/empty.php", // path to an empty file, used for ping test. must be relative to this js file
@@ -596,6 +596,7 @@ function pingTest(done) {
 	var i = 0; // counter of pongs received
 	var prevInstspd = 0; // last ping time, used for jitter calculation
 	xhr = [];
+	var totalInstspd = 0;
 	// ping function
 	var doPing = function() {
 		tverb("ping");
@@ -609,14 +610,18 @@ function pingTest(done) {
 				prevT = new Date().getTime(); // first pong
 			} else {
 				var instspd = new Date().getTime() - prevT;
+				// console.log("instspd:" + String(instspd));  没用了
 				if (settings.ping_allowPerformanceApi) {
 					try {
 						//try to get accurate performance timing using performance api
 						var p = performance.getEntries();
-						p = p[p.length - 1];
+						p = p[p.length - 1]; // 拿最后的请求的性能数据
 						var d = p.responseStart - p.requestStart;
 						if (d <= 0) d = p.duration;
-						if (d > 0 && d < instspd) instspd = d;
+						if (d > 0 && d < instspd) {
+							instspd = d;
+							console.log("instspd = d; instspd:" + String(instspd));
+						}
 					} catch (e) {
 						//if not possible, keep the estimate
 						tverb("Performance API not supported, using estimate");
@@ -625,25 +630,44 @@ function pingTest(done) {
 				//noticed that some browsers randomly have 0ms ping
 				if (instspd < 1) instspd = prevInstspd;
 				if (instspd < 1) instspd = 1;
+
+
 				var instjitter = Math.abs(instspd - prevInstspd);
-				if (i === 1) ping = instspd;
+				
+				totalInstspd += instspd;
+
+				if (i === 1) {
+					ping = instspd;
+					console.log("i === 1 ping:" + ping)
+				}
 				/* first ping, can't tell jitter yet*/ else {
-					if (instspd < ping) ping = instspd; // update ping, if the instant ping is lower
+					// if (instspd < ping) {
+					if (instspd > ping) { // 显示最大值
+						ping = instspd; // update ping, if the instant ping is lower
+						console.log("instspd < ping ping:" + ping)
+					}
 					if (i === 2) jitter = instjitter;
 					//discard the first jitter measurement because it might be much higher than it should be
 					else jitter = instjitter > jitter ? jitter * 0.3 + instjitter * 0.7 : jitter * 0.8 + instjitter * 0.2; // update jitter, weighted average. spikes in ping values are given more weight.
 				}
 				prevInstspd = instspd;
 			}
-			pingStatus = ping.toFixed(2);
-			jitterStatus = jitter.toFixed(2);
+			// pingStatus = ping.toFixed(2);
+			// jitterStatus = jitter.toFixed(2);
+			jitterStatus = ping.toFixed(2);
+			
 			i++;
 			tverb("ping: " + pingStatus + " jitter: " + jitterStatus);
+			console.log("ping: " + pingStatus + " jitter: " + jitterStatus);
 			if (i < settings.count_ping) doPing();
 			else {
 				// more pings to do?
 				pingProgress = 1;
 				tlog("ping: " + pingStatus + " jitter: " + jitterStatus + ", took " + (new Date().getTime() - startT) + "ms");
+				console.log("ping: " + pingStatus + " jitter: " + jitterStatus + ", took " + (new Date().getTime() - startT) + "ms");
+
+				// jitterStatus = pingStatus;
+				pingStatus = (totalInstspd/settings.count_ping - 1).toFixed(2); // 改用来显示平均值
 				done();
 			}
 		}.bind(this);
